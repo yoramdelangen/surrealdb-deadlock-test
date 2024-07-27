@@ -1,0 +1,12 @@
+[package]
+name = "surreal-3987"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.86"
+axum = "0.7.5"
+rand = "0.8.5"
+serde = { version = "1.0.204", features = ["derive"] }
+surrealdb = "1.5.4"
+tokio = { version = "1.39.1", features = ["rt-multi-thread", "time"] }

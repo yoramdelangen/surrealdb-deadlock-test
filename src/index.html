@@ -1,0 +1,75 @@
+<html>
+<head>
+    <title>SurrealDB #3987 - Bug: Deadlock encountered</title>
+    <script preload src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-2">
+    <h1 class="text-3xl font-bold">Hellow World</h1>
+    <div class="p-2">
+        <div id="blocks" class="p-2 border-b border-gray-400">
+
+        </div>
+
+        <pre id="initial-result" class="py-2">Loading inital results</pre>
+    </div>
+    <script type="module">
+        import Surreal from './surrealdb-beta9.js';
+
+        const NUM_OF_LISTENERS = 5;
+
+        (async () => {
+            const db = new Surreal();
+            try {
+                await db.connect("ws://127.0.0.1:8000/rpc");
+                await db.use({ namespace: "test", database: "test" });
+            } catch (err) {
+                console.error("Failed to connect to SurrealDB:", err);
+                throw err;
+            }
+
+            const result = await db.query('SELECT * FROM tests');
+            document.getElementById('initial-result').innerHTML = JSON.stringify(result, null, 4);
+            console.log('Results (and working): ', result);
+
+            const blocks = document.getElementById('blocks');
+
+            const track = Array(NUM_OF_LISTENERS);
+            console.log(track);
+            for (let i = 0; i < NUM_OF_LISTENERS; i++) {
+                blocks.innerHTML += `<div id="block-${i+1}">Loading ${i+1}</div>`;
+
+                // The uuid of the live query will be returned
+                const thing = `tests:${i+1}`;
+                const queryUuid = await db.live(
+                    'tests',
+                    // The callback function takes two arguments: the 'action' and 'result' properties
+                    ({ action, result }) => {
+                        // action can be: 'CREATE', 'UPDATE', 'DELETE' or 'CLOSE'
+                        if (action === 'CLOSE') {
+                            console.log(`Connection is closed for session ${i}`);
+                            return;
+                        }
+
+                        const x = parseInt(result.id.split(':')[1]);
+                        const block = document.getElementById(`block-${x}`);
+                        const now = parseInt(Date.now()/1000);
+
+                        block.innerHTML = `T: ${result.title}: Updated ago: <span>${now-result.timestamp}s</span>`;
+                        track[x-1] = result.timestamp;
+                    }
+                );
+                console.log(queryUuid.toString(), thing, 'socket', i);
+            }
+
+            setInterval(() => {
+                const now = parseInt(Date.now()/1000);
+                for (let i = 0; i < track.length; i++) {
+                    const block = document.querySelector(`#block-${i+1} span`);
+                    if (!block) continue
+                    block.innerHTML = `${now-track[i]}s`;
+                }
+            }, 1000);
+        })();
+    </script>
+</body>
+</html>
